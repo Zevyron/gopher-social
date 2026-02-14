@@ -17,17 +17,22 @@ type config struct {
 	addr string
 }
 
-func (app *application) mount() *chi.Mux {
+func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
-
-	r.Get("/v1/health", app.healthCheckHandler)
+	r.Use(middleware.Recoverer)
+	
+	r.Route("/v1", func(r chi.Router) {
+		r.Get("/health", app.healthCheckHandler)
+	} )
 
 	return r
 }
 
-func (app *application) run(mux *chi.Mux) error {
+func (app *application) run(mux http.Handler) error {
 
 	srv := &http.Server{
 		Addr: app.config.addr,
