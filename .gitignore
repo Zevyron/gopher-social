@@ -1,1 +1,8 @@
 .envrc
+
+# Build artifacts and executables
+/bin/
+*.exe
+
+# Log files
+*.log
