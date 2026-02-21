@@ -29,7 +29,7 @@ func (s *PostgresPostsStore) Create(ctx context.Context, post *Post) error {
 	`
 
 	err := s.db.QueryRowContext(ctx, query, post.Content, post.Title, post.UserID, pq.Array(post.Tags)).Scan(
-		&post.ID, &post.CreatedAt, &post.UpdatedAt, &post.DeletedAt,
+		&post.ID, &post.CreatedAt, &post.UpdatedAt,
 	)
 
 	if err != nil {
