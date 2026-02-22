@@ -3,10 +3,16 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
+)
+
+var (
+	ErrNotFound = errors.New("resource not found")
 )
 
 type PostStore interface {
 	Create(ctx context.Context, post *Post) error
+	GetByID(ctx context.Context, postID int64) (*Post, error)
 }
 
 type UserStore interface {
