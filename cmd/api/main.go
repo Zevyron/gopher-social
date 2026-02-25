@@ -6,6 +6,7 @@ import (
 	"github.com/Zevyron/gopher-social/internal/db"
 	"github.com/Zevyron/gopher-social/internal/env"
 	"github.com/Zevyron/gopher-social/internal/store"
+	"github.com/go-playground/validator/v10"
 )
 
 const version = "0.0.1"
@@ -32,9 +33,12 @@ func main() {
 	
 	appStore := store.NewPostgresStorage(db)
 
+	v := validator.New(validator.WithRequiredStructEnabled())
+
 	app := &application{
 		config: cfg,
 		store: appStore,
+		validator: v,
 	}
 
 	
