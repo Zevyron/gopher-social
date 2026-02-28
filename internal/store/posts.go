@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/lib/pq"
 )
@@ -59,4 +60,25 @@ func (s *PostgresPostStore) GetByID(ctx context.Context, postID int64) (*Post, e
 	}
 
 	return &post, nil
+}
+
+func (s *PostgresPostStore) DeleteByPostID(ctx context.Context, postID int64) (error) {
+	query := `
+		DELETE FROM posts WHERE id = $1
+	`
+	result, err := s.db.ExecContext(ctx, query, postID)
+	if err != nil {
+		return fmt.Errorf("error executing delete for post id %d: %w", postID, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error for checking rows affected for delete: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no post deleted for id %d: %w", postID, errors.New("record not found"))
+	}
+
+	return nil
 }

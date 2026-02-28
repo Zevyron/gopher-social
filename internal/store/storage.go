@@ -13,6 +13,7 @@ var (
 type PostStore interface {
 	Create(ctx context.Context, post *Post) error
 	GetByID(ctx context.Context, postID int64) (*Post, error)
+	DeleteByPostID(ctx context.Context, postID int64) error
 }
 
 type UserStore interface {
