@@ -30,10 +30,16 @@ type CommentStore interface {
 	
 }
 
+type FollowStore interface {
+	Follow(ctx context.Context, followUser int64, userID int64) error
+	Unfollow(ctx context.Context, followUser int64, userID int64) error
+}
+
 type Storage struct {
 	Posts PostStore
 	Users UserStore
 	Comments CommentStore
+	Followers FollowStore
 
 }
 
@@ -42,5 +48,6 @@ func NewPostgresStorage(db *sql.DB) *Storage {
 		Posts: &PostgresPostStore{db},
 		Users: &PostgresUserStore{db},
 		Comments: &PostgresCommentStore{db},
+		Followers: &PostgresFollowerStore{db},
 	}
 }

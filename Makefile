@@ -1,5 +1,5 @@
 include .envrc
-DB_URL=postgres://admin:adminpassword@localhost:5432/social?sslmode=disable
+DB_URL ?= postgres://admin:adminpassword@localhost:5432/social?sslmode=disable
 MIGRATIONS_PATH=./cmd/migrate/migrations
 
 .PHONY: migrate-create migrate-up migrate-down seed
