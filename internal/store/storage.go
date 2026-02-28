@@ -20,6 +20,7 @@ type PostStore interface {
 }
 
 type UserStore interface {
+	GetByID(ctx context.Context, userID int64) (*User, error)
 	Create(ctx context.Context, user *User) error
 }
 
