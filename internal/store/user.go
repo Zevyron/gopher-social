@@ -22,7 +22,7 @@ type PostgresUserStore struct {
 
 func (u *PostgresUserStore) Create(ctx context.Context, user *User) error {
 	query := `
-	INSERT INTO users(username, first_name, last_name, email, password) VALUES($1, $2, $3) RETURNING id, created_at
+	INSERT INTO users(username, first_name, last_name, email, password) VALUES($1, $2, $3, $4, $5) RETURNING id, created_at
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)

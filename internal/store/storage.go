@@ -24,7 +24,9 @@ type UserStore interface {
 }
 
 type CommentStore interface {
+	Create(ctx context.Context, comment *Comment) error
 	GetByPostID(ctx context.Context, postID int64) ([]Comment, error)
+	
 }
 
 type Storage struct {
