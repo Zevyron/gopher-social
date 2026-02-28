@@ -17,13 +17,14 @@ type Post struct {
 	CreatedAt		string		`json:"created_at"`
 	UpdatedAt		string		`json:"updated_at"`
 	DeletedAt		string		`json:"deleted_at"`
+	Comments		[]Comment	`json:"comments"`
 }
 
-type PostgresPostsStore struct { // can omit postgres since only postgres is being used
+type PostgresPostStore struct { // can omit postgres since only postgres is being used
 	db *sql.DB
 }
 
-func (s *PostgresPostsStore) Create(ctx context.Context, post *Post) error {
+func (s *PostgresPostStore) Create(ctx context.Context, post *Post) error {
 	query := `
 		INSERT INTO posts (content, title, user_id, tags)
 		VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at	
@@ -40,7 +41,7 @@ func (s *PostgresPostsStore) Create(ctx context.Context, post *Post) error {
 	return nil
 }
 
-func (s *PostgresPostsStore) GetByID(ctx context.Context, postID int64) (*Post, error) {
+func (s *PostgresPostStore) GetByID(ctx context.Context, postID int64) (*Post, error) {
 	query := `
 		SELECT id, user_id, title, content, created_at, updated_at, tags FROM posts WHERE id = $1	
 	`

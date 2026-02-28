@@ -16,11 +16,11 @@ type User struct {
 	UpdatedAt		string		`json:"updated_at"`
 }
 
-type PostgresUsersStore struct {
+type PostgresUserStore struct {
 	db *sql.DB
 }
 
-func (u *PostgresUsersStore) Create(ctx context.Context, user *User) error {
+func (u *PostgresUserStore) Create(ctx context.Context, user *User) error {
 	query := `
 	INSERT INTO users(username, first_name, last_name, email, password) VALUES($1, $2, $3) RETURNING id, created_at
 	`
