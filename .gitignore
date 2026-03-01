@@ -6,3 +6,8 @@
 
 # Log files
 *.log
+
+# Swagger generated docs
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go
