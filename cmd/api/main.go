@@ -1,12 +1,11 @@
 package main
 
 import (
-	"log"
-
 	"github.com/Zevyron/gopher-social/internal/db"
 	"github.com/Zevyron/gopher-social/internal/env"
 	"github.com/Zevyron/gopher-social/internal/store"
 	"github.com/go-playground/validator/v10"
+	"go.uber.org/zap"
 )
 
 const version = "0.0.1"
@@ -41,13 +40,18 @@ func main() {
 		env: env.GetString("ENV", "development"),
 	}
 
+	// Logger
+	logger := zap.Must(zap.NewProduction()).Sugar()
+	defer logger.Sync()
+
+	// Database
 	db, err := db.New(cfg.db.addr, cfg.db.maxOpenConns, cfg.db.maxIdleConns, cfg.db.maxIdleTime)
 	if err != nil {
-		log.Panic(err)
+		logger.Fatal(err)
 	}
 
 	defer db.Close()
-	log.Printf("database connection pool established")
+	logger.Info("database connection pool established")
 	
 	appStore := store.NewPostgresStorage(db)
 
@@ -57,10 +61,11 @@ func main() {
 		config: cfg,
 		store: appStore,
 		validator: v,
+		logger: logger,
 	}
 
 	
 
 	mux := app.mount()
-	log.Fatal(app.run(mux))
+	logger.Fatal(app.run(mux))
 }
