@@ -11,6 +11,24 @@ import (
 
 const version = "0.0.1"
 
+
+// @title                       GopherSocial API
+// @version                     1.0
+// @description                 Production-grade social networking backend built in Go.
+// @termsOfService              http://swagger.io/terms/
+
+// @contact.name                API Support
+// @contact.email               support@gophersocial.dev
+
+// @license.name                Apache 2.0
+// @license.url                 http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @BasePath                    /v1
+
+// @securityDefinitions.apikey  ApiKeyAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Include the Bearer prefix: "Bearer <token>"
 func main() {
 	cfg := config{
 		addr: env.GetString("ADDR", ":8080"),

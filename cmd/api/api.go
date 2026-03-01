@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/MarceloPetrucio/go-scalar-api-reference"
 	"github.com/Zevyron/gopher-social/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -37,6 +39,31 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+    content, err := os.ReadFile("./docs/swagger.json")
+    if err != nil {
+        http.Error(w, "swagger.json not found", http.StatusInternalServerError)
+        return
+    }
+
+    htmlContent, err := scalar.ApiReferenceHTML(&scalar.Options{
+        SpecContent: string(content),
+        DarkMode:    true,
+        CustomOptions: scalar.CustomOptions{
+            PageTitle: "GopherSocial API Reference",
+        },
+    })
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte(htmlContent))
+})
+
 	
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/health", app.healthCheckHandler)

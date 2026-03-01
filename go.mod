@@ -7,6 +7,7 @@ require github.com/go-chi/chi/v5 v5.2.5
 require github.com/lib/pq v1.11.2
 
 require (
+	github.com/MarceloPetrucio/go-scalar-api-reference v0.0.0-20240521013641-ce5d2efe0e06 // indirect
 	github.com/brianvoe/gofakeit/v7 v7.14.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect

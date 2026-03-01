@@ -1,0 +1,80 @@
+basePath: /v1
+info:
+  contact:
+    email: support@gophersocial.dev
+    name: API Support
+  description: Production-grade social networking backend built in Go.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: GopherSocial API
+  version: "1.0"
+paths:
+  /users/feed:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a cursor-paginated timeline with tags, text search, and
+        RFC3339 date-range filters.
+      parameters:
+      - default: 20
+        description: Items per page (1-20)
+        in: query
+        name: limit
+        type: integer
+      - default: desc
+        description: Sort direction (asc, desc)
+        in: query
+        name: sort
+        type: string
+      - description: URL-safe base64 composite cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Comma-separated tags (e.g., go,backend)
+        in: query
+        name: tags
+        type: string
+      - description: Search keyword in title or content
+        in: query
+        name: search
+        type: string
+      - description: Lower bound timestamp (RFC3339, e.g., 2026-02-01T00:00:00Z)
+        in: query
+        name: since
+        type: string
+      - description: Upper bound timestamp (RFC3339, e.g., 2026-02-28T23:59:59Z)
+        in: query
+        name: until
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Feed items and pagination metadata
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request (invalid dates or query params)
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Fetches the user's feed
+      tags:
+      - feed
+securityDefinitions:
+  ApiKeyAuth:
+    description: 'Include the Bearer prefix: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
