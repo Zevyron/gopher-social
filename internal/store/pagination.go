@@ -6,12 +6,17 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type PaginatedFeedQuery struct {
-	Limit  int    `json:"limit" validate:"gte=1,lte=20"`
-	Sort   string `json:"sort" validate:"oneof=asc desc"`
-	Cursor string `json:"cursor"`
+	Limit  	int    		`json:"limit" validate:"gte=1,lte=20"`
+	Sort   	string 		`json:"sort" validate:"oneof=asc desc"`
+	Cursor 	string 		`json:"cursor"`
+	Tags	[]string	`json:"tags" validate:"max=30"`
+	Search	string		`json:"search" validate:"max=100"`
+	Since	string 		`json:"since"`
+	Until	string		`json:"until"`
 }
 
 func (fq PaginatedFeedQuery) Parse(r *http.Request) (PaginatedFeedQuery, error) {
@@ -36,6 +41,31 @@ func (fq PaginatedFeedQuery) Parse(r *http.Request) (PaginatedFeedQuery, error) 
 	cursor := qs.Get("cursor")
 	if cursor != "" {
 		fq.Cursor = cursor
+	}
+
+	tags := qs.Get("tags")
+	if tags != "" {
+		fq.Tags = strings.Split(tags, ",")
+	}
+
+	search := qs.Get("search")
+	if search != "" {
+		fq.Search = search
+	}
+
+	// RFC3339 includes hours, minutes, seconds and a time zone offset
+	if since := qs.Get("since"); since != "" {
+		if _, err := time.Parse(time.RFC3339, since); err != nil {
+			return fq, fmt.Errorf("invalid 'since' format, expected RFC3339 (e.g., 2026-01-01T00:00:00Z)")
+		}
+		fq.Since = since
+	}
+
+	if until := qs.Get("until"); until != "" {
+		if _, err := time.Parse(time.RFC3339, until); err != nil {
+			return fq, fmt.Errorf("invalid 'until' format, expected RFC3339 (e.g., 2026-03-01T00:00:00Z)")
+		}
+		fq.Until = until
 	}
 
 	return fq, nil

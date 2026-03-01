@@ -27,7 +27,7 @@ func (app *application) getUserFeedHandler(w http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 
-	// TODO: get userID from auth
+	// TODO: get userID from auth instead of hardcoding userID
 	feed, err := app.store.Posts.GetUserFeed(ctx, int64(43898), fq)
 	if err != nil {
 		app.internalServerError(w, r, err)

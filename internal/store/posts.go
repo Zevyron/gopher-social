@@ -136,6 +136,9 @@ func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq Pa
 		return nil, fmt.Errorf("invalid cursor: %w", err)
 	}
 
+	args := []any{userID, timestamp, cursorID}
+
+
 	query := `
 		SELECT p.id, p.user_id, p.title, p.content, p.created_at, p.version, p.tags,
 			u.username,
@@ -150,15 +153,40 @@ func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq Pa
 			p.created_at < $2 OR 
 			(p.created_at = $2 AND p.id < $3)
 		)
+	`
+
+	if len(fq.Tags) > 0 {
+		args = append(args, pq.Array(fq.Tags))
+		query += fmt.Sprintf(" AND p.tags @> $%d", len(args))
+	}
+
+	if fq.Search != "" {
+		args = append(args, "%"+fq.Search+"%")
+		searchParam := fmt.Sprintf("$%d", len(args))
+		query += fmt.Sprintf(" AND (p.title ILIKE %s OR p.content ILIKE %s)", searchParam, searchParam)
+	}
+
+	if fq.Since != "" {
+		args = append(args, fq.Since)
+		query += fmt.Sprintf(" AND p.created_at >= $%d", len(args))
+	}
+
+	if fq.Until != "" {
+		args = append(args, fq.Until)
+		query += fmt.Sprintf(" AND p.created_at <= $%d", len(args))
+	}
+
+	args = append(args, fq.Limit)
+	query += fmt.Sprintf(`
 		GROUP BY p.id, u.username
 		ORDER BY p.created_at ` + sortDir + `, p.id DESC
-		LIMIT $4;
-	`
+		LIMIT $%d;
+	`, len(args))
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, userID, timestamp, cursorID, fq.Limit)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
