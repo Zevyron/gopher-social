@@ -124,24 +124,41 @@ func(s *PostgresPostStore) Update(ctx context.Context, post *Post) error {
 	return nil
 }
 
-func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64) ([]PostWithMetadata, error) {
-	query :=`
-		SELECT p.id, p.user_id, p.title, p.content, p.created_at, p.version, p.tags, 
-		u.username, 
-		COUNT(c.id) AS comments_count
+func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq PaginatedFeedQuery) ([]PostWithMetadata, error) {
+
+	sortDir := "DESC"
+	if fq.Sort == "asc" {
+		sortDir = "ASC"
+	}
+
+	timestamp, cursorID, err := DecodeCursor(fq.Cursor)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cursor: %w", err)
+	}
+
+	query := `
+		SELECT p.id, p.user_id, p.title, p.content, p.created_at, p.version, p.tags,
+			u.username,
+			COUNT(c.id) AS comments_count
 		FROM posts p
 		LEFT JOIN comments c ON c.post_id = p.id
 		LEFT JOIN users u ON p.user_id = u.id
-		JOIN followers f ON f.follower_id = p.user_id OR p.user_id = $1
-		WHERE f.user_id = $1 OR p.user_id = $1
+		WHERE (p.user_id = $1 OR p.user_id IN (
+			SELECT user_id FROM followers WHERE follower_id = $1
+		))
+		AND (
+			p.created_at < $2 OR 
+			(p.created_at = $2 AND p.id < $3)
+		)
 		GROUP BY p.id, u.username
-		ORDER BY p.created_at DESC;
+		ORDER BY p.created_at ` + sortDir + `, p.id DESC
+		LIMIT $4;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID, timestamp, cursorID, fq.Limit)
 	if err != nil {
 		return nil, err
 	}

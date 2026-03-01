@@ -17,7 +17,7 @@ type PostStore interface {
 	GetByID(ctx context.Context, postID int64) (*Post, error)
 	DeleteByPostID(ctx context.Context, postID int64) error
 	Update(ctx context.Context, post *Post) error
-	GetUserFeed(context.Context, int64) ([]PostWithMetadata, error)
+	GetUserFeed(context.Context, int64, PaginatedFeedQuery) ([]PostWithMetadata, error)
 }
 
 type UserStore interface {
