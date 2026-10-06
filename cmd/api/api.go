@@ -1,12 +1,21 @@
 package main
 
 import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
+	"github.com/Zevyron/gopher-social/internal/mailer"
 	"github.com/Zevyron/gopher-social/internal/store"
+	"github.com/Zevyron/gopher-social/internal/worker"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-playground/validator/v10"
@@ -18,12 +27,20 @@ type application struct {
 	store 	*store.Storage
 	validator *validator.Validate
 	logger *zap.SugaredLogger
+	db	*sql.DB
+	mailer mailer.Client
 }
 
 type config struct {
-	addr 	string
-	db 		dbConfig
-	env 	string
+	addr 		string
+	frontendURL string
+	db 			dbConfig
+	env 		string
+	mail 		mailConfig
+}
+
+type mailConfig struct {
+	exp time.Duration
 }
 
 type dbConfig struct {
@@ -69,6 +86,12 @@ func (app *application) mount() http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/health", app.healthCheckHandler)
 
+		r.Route("/authentication", func(r chi.Router) {
+			r.Post("/user", app.registerUserHandler)
+			r.Put("/activate/{token}", app.activateUserHandler)
+			r.Post("/token/resend", app.resendActivationTokenHandler)
+		})
+
 		r.Route("/posts", func(r chi.Router) {
 			r.Post("/", app.createPostHandler)
 
@@ -93,7 +116,6 @@ func (app *application) mount() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Get("/feed", app.getUserFeedHandler)
 			})
-			
 		})
 	})
 
@@ -101,16 +123,55 @@ func (app *application) mount() http.Handler {
 }
 
 func (app *application) run(mux http.Handler) error {
+	// Root context that listens for termination signals
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
+	var wg sync.WaitGroup
+
+	// Start the Outbox Worker in a background goroutine
+	outboxWorker := worker.NewOutboxWorker(app.db, app.mailer, app.logger, app.config.frontendURL)
+	wg.Add(1)
+	go outboxWorker.Start(ctx, &wg)
+
+	// Configure HTTP Server
 	srv := &http.Server{
-		Addr: app.config.addr,
-		Handler: mux,
-		WriteTimeout: time.Second * 30,
-		ReadTimeout: time.Second * 10,
-		IdleTimeout: time.Minute,
+		Addr:         app.config.addr,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  time.Minute,
 	}
 
-	app.logger.Infow("Server has started", "addr", app.config.addr, "env", app.config.env)
+	serverErrors := make(chan error, 1)
+	go func() {
+		app.logger.Infow("server is listening", "addr", srv.Addr, "env", app.config.env)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrors <- err
+		}
+	}()
 
-	return srv.ListenAndServe()
+	// Block until SIGINT/SIGTERM or a server error
+	select {
+	case err := <-serverErrors:
+		return fmt.Errorf("server error: %w", err)
+	case <-ctx.Done():
+		app.logger.Info("shutdown signal received; terminating background processes...")
+	}
+
+	// Gracefully drain the HTTP server - 10-second timeout
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelShutdown()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		_ = srv.Close()
+		return fmt.Errorf("failed to shutdown http server cleanly: %w", err)
+	}
+
+	// Wait for the Outbox Worker to finish its current batch
+	app.logger.Info("waiting for background workers to finish...")
+	wg.Wait()
+
+	app.logger.Info("application exited cleanly")
+	return nil
 }

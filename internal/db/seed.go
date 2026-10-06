@@ -15,7 +15,7 @@ func Seed(store store.Storage) {
 
 	users := generateUsers(100)
 	for _, user := range users {
-		if err := store.Users.Create(ctx, user); err != nil {
+		if err := store.Users.Create(ctx, nil, user); err != nil {
 			log.Println("Error creating user:", err)
 			return
 		}
@@ -42,6 +42,11 @@ func Seed(store store.Storage) {
 
 func generateUsers(num int) []*store.User {
 	users := make([]*store.User, num)
+	
+	template := &store.User{}
+	if err := template.Password.Set("1234567"); err != nil {
+		log.Println("failed to hash seed password: ", err)
+	}
 
 	for i := 0; i < num; i++ {
 		users[i] = &store.User{
@@ -49,7 +54,7 @@ func generateUsers(num int) []*store.User {
 			FirstName: gofakeit.FirstName(),
 			LastName:  gofakeit.LastName(),
 			Email:     gofakeit.Email(),
-			Password:  "123123", 
+			Password:  template.Password, 
 		}
 	}
 

@@ -1,0 +1,1 @@
+ALTER users DROP COLUMN is_active;

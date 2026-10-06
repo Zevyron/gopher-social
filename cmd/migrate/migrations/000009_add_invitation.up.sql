@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS user_invitations (
+    token      BYTEA PRIMARY KEY,
+    user_id    BIGINT UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expiry     TIMESTAMP(0) WITH TIME ZONE NOT NULL
+);

@@ -22,7 +22,10 @@ type PostStore interface {
 
 type UserStore interface {
 	GetByID(ctx context.Context, userID int64) (*User, error)
-	Create(ctx context.Context, user *User) error
+	Create(ctx context.Context, tx *sql.Tx, user *User) error
+	CreateAndInvite(ctx context.Context, user *User, plainToken string, tokenHash []byte, invitationExp time.Duration) error
+	Activate(ctx context.Context, plainToken string) error
+	ResendInvitation(ctx context.Context, email, plainToken string, tokenHash []byte, invitationExp time.Duration) error
 }
 
 type CommentStore interface {
@@ -51,4 +54,18 @@ func NewPostgresStorage(db *sql.DB) *Storage {
 		Comments: &PostgresCommentStore{db},
 		Followers: &PostgresFollowerStore{db},
 	}
+}
+
+func withTx(db *sql.DB, ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
