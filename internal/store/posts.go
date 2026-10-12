@@ -127,8 +127,11 @@ func(s *PostgresPostStore) Update(ctx context.Context, post *Post) error {
 func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq PaginatedFeedQuery) ([]PostWithMetadata, error) {
 
 	sortDir := "DESC"
+	cursorDir := "<"
+
 	if fq.Sort == "asc" {
 		sortDir = "ASC"
+		cursorDir = ">"
 	}
 
 	timestamp, cursorID, err := DecodeCursor(fq.Cursor)
@@ -139,7 +142,7 @@ func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq Pa
 	args := []any{userID, timestamp, cursorID}
 
 
-	query := `
+	query := fmt.Sprintf(`
 		SELECT p.id, p.user_id, p.title, p.content, p.created_at, p.version, p.tags,
 			u.username,
 			COUNT(c.id) AS comments_count
@@ -150,10 +153,10 @@ func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq Pa
 			SELECT user_id FROM followers WHERE follower_id = $1
 		))
 		AND (
-			p.created_at < $2 OR 
-			(p.created_at = $2 AND p.id < $3)
+			p.created_at %s $2 OR 
+			(p.created_at = $2 AND p.id %s $3)
 		)
-	`
+	`, cursorDir, cursorDir)
 
 	if len(fq.Tags) > 0 {
 		args = append(args, pq.Array(fq.Tags))
@@ -207,7 +210,7 @@ func (s *PostgresPostStore) GetUserFeed(ctx context.Context, userID int64, fq Pa
 			&p.User.Username,
 			&p.CommentCount,
 		)
-		if err != nil {
+		if err = rows.Err();  err != nil {
 			return nil, err
 		}
 

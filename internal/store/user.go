@@ -40,6 +40,18 @@ func (p *password) Set(text string) error {
 	return nil
 }
 
+func (p *password) Matches(plainPassword string) (bool, error) {
+	err := bcrypt.CompareHashAndPassword(p.hash, []byte(plainPassword))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return false, err
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 type PostgresUserStore struct {
 	db *sql.DB
 }
@@ -100,7 +112,7 @@ func (u *PostgresUserStore) GetByID(ctx context.Context, userID int64) (*User, e
 	defer cancel()
 
 	user := &User{}
-	err := u.db.QueryRowContext(ctx, query, userID).Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName, &user.Email, &user.Password, &user.CreatedAt)
+	err := u.db.QueryRowContext(ctx, query, userID).Scan(&user.ID, &user.Username, &user.FirstName, &user.LastName, &user.Email, &user.Password.hash, &user.CreatedAt)
 
 	if err != nil {
 		switch err {
@@ -255,4 +267,33 @@ func (s *PostgresUserStore) ResendInvitation(ctx context.Context, email, plainTo
 
 		return InsertOutboxEvent(ctx, tx, "user.created", payload)
 		})
+}
+
+func (u *PostgresUserStore) GetByEmail(ctx context.Context, email string) (*User, error) {
+	query := `
+		SELECT id, username, email, password, is_active, created_at
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, QueryTimeoutDuration)
+	defer cancel()
+
+	user := &User{}
+	err := u.db.QueryRowContext(ctx, query, email).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Password.hash,
+		&user.IsActive,
+		&user.CreatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+	}
+
+	return user, nil
 }

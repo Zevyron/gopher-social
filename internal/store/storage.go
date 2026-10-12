@@ -26,6 +26,7 @@ type UserStore interface {
 	CreateAndInvite(ctx context.Context, user *User, plainToken string, tokenHash []byte, invitationExp time.Duration) error
 	Activate(ctx context.Context, plainToken string) error
 	ResendInvitation(ctx context.Context, email, plainToken string, tokenHash []byte, invitationExp time.Duration) error
+	GetByEmail(ctx context.Context, email string) (*User, error)
 }
 
 type CommentStore interface {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
+	"github.com/Zevyron/gopher-social/internal/auth"
 	"github.com/Zevyron/gopher-social/internal/mailer"
 	"github.com/Zevyron/gopher-social/internal/store"
 	"github.com/Zevyron/gopher-social/internal/worker"
@@ -23,12 +24,13 @@ import (
 )
 
 type application struct {
-	config 	config
-	store 	*store.Storage
-	validator *validator.Validate
-	logger *zap.SugaredLogger
-	db	*sql.DB
-	mailer mailer.Client
+	config 			config
+	store 			*store.Storage
+	validator 		*validator.Validate
+	logger 			*zap.SugaredLogger
+	db				*sql.DB
+	mailer 			mailer.Client
+	authenticator 	auth.Authenticator
 }
 
 type config struct {
@@ -37,6 +39,17 @@ type config struct {
 	db 			dbConfig
 	env 		string
 	mail 		mailConfig
+	auth		authConfig
+}
+
+type authConfig struct {
+	token tokenConfig
+}
+
+type tokenConfig struct {
+	secret 	string
+	exp		time.Duration
+	iss		string
 }
 
 type mailConfig struct {
@@ -90,9 +103,12 @@ func (app *application) mount() http.Handler {
 			r.Post("/user", app.registerUserHandler)
 			r.Put("/activate/{token}", app.activateUserHandler)
 			r.Post("/token/resend", app.resendActivationTokenHandler)
+			r.Post("/token", app.CreateTokenHandler)
 		})
 
 		r.Route("/posts", func(r chi.Router) {
+			r.Use(app.AuthTokenMiddleware)
+
 			r.Post("/", app.createPostHandler)
 
 			r.Route("/{postID}", func(r chi.Router) {
@@ -106,7 +122,7 @@ func (app *application) mount() http.Handler {
 		
 		r.Route("/users", func(r chi.Router) {
 			r.Route("/{userID}", func(r chi.Router) {
-				r.Use(app.userContextMiddleware)
+				r.Use(app.AuthTokenMiddleware)
 				
 				r.Get("/", app.getUserHandler)
 				r.Put("/follow", app.followUserHandler)
@@ -114,6 +130,7 @@ func (app *application) mount() http.Handler {
 			})
 
 			r.Group(func(r chi.Router) {
+				r.Use(app.AuthTokenMiddleware)
 				r.Get("/feed", app.getUserFeedHandler)
 			})
 		})

@@ -2,10 +2,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Zevyron/gopher-social/internal/store"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type RegisterUserPayload struct {
@@ -18,6 +21,11 @@ type RegisterUserPayload struct {
 
 type ResendTokenPayload struct {
 	Email string `json:"email" validate:"required,email,max=255" example:"john.doe@example.com"`
+}
+
+type CreateUserTokenPayload struct {
+	Email string `json:"email" validate:"required,email,max=255"`
+	Password	string	`json:"password" validate:"required,min=8,max=72"`
 }
 
 // registerUserHandler godoc
@@ -158,5 +166,69 @@ func (app *application) resendActivationTokenHandler(w http.ResponseWriter, r *h
 	if err := app.jsonResponse(w, http.StatusAccepted, response); err != nil {
 		app.internalServerError(w, r, err)
 		return
+	}
+}
+
+func (app *application) CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var payload CreateUserTokenPayload
+	if err := readJSON(w, r, &payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	if err := app.validator.Struct(payload); err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	ctx := r.Context()
+	user, err := app.store.Users.GetByEmail(ctx, payload.Email)
+	fmt.Println(err)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			app.unauthorizedResponse(w, r, errors.New("invalid credentials"))
+		default:
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	if !user.IsActive {
+		app.unauthorizedResponse(w, r, errors.New("account is not activated, please check your email"))
+		return
+	}
+
+	matched, err := user.Password.Matches(payload.Password)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+	if !matched {
+		app.unauthorizedResponse(w, r, errors.New("invalid credentials"))
+		return
+	}
+
+	claims := jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(app.config.auth.token.exp).Unix(),
+		"iat": time.Now().Unix(),
+		"nbf": time.Now().Unix(),
+		"iss": app.config.auth.token.iss,
+		"aud": app.config.auth.token.iss,
+	}
+
+	token, err := app.authenticator.GenerateToken(claims)
+	if err != nil {
+		app.internalServerError(w, r, err)
+		return
+	}
+
+	response := map[string]any{
+		"token": token,
+	}
+
+	if err := app.jsonResponse(w, http.StatusCreated, response); err != nil {
+		app.internalServerError(w, r, err)
 	}
 }

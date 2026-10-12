@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/Zevyron/gopher-social/internal/auth"
 	"github.com/Zevyron/gopher-social/internal/db"
 	"github.com/Zevyron/gopher-social/internal/env"
 	"github.com/Zevyron/gopher-social/internal/mailer"
@@ -27,11 +28,28 @@ func main() {
 		mail: mailConfig{
 			exp: time.Hour * 24 * 3, // 3 days
 		},
+		auth: authConfig{
+				token: tokenConfig{
+						secret: env.GetString("AUTH_TOKEN_SECRET", ""),
+						exp:	time.Minute * 15,
+						iss:	env.GetString("AUTH_TOKEN_ISS", "gophersocial"),
+				},
+		},
 	}
 
 	// Logger
 	logger := zap.Must(zap.NewProduction()).Sugar()
 	defer logger.Sync()
+
+	// Auth secret checks
+	if cfg.auth.token.secret == "" {
+		if cfg.env == "development" {
+			cfg.auth.token.secret = "dev-only-secret-key-do-not-use-in-production"
+			logger.Warn("using default insecure JWT secret in development mode")
+		} else {
+			logger.Fatal("AUTH_TOKEN_SECRET enviroment variable is required in non-development environments")
+		}
+	}
 
 	// Database Connection Pool
 	dbConn, err := db.New(cfg.db.addr, cfg.db.maxOpenConns, cfg.db.maxIdleConns, cfg.db.maxIdleTime)
@@ -61,6 +79,12 @@ func main() {
 
 	appStore := store.NewPostgresStorage(dbConn)
 	v := validator.New(validator.WithRequiredStructEnabled())
+	
+	jwtAuthenticator := auth.NewJWTAuthenticator(
+		cfg.auth.token.secret,
+		cfg.auth.token.iss,
+		cfg.auth.token.iss,
+	)
 
 	app := &application{
 		config:    cfg,
@@ -69,6 +93,7 @@ func main() {
 		validator: v,
 		logger:    logger,
 		mailer:    mailClient,
+		authenticator: jwtAuthenticator,
 	}
 
 	mux := app.mount()

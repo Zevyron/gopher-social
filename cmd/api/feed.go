@@ -26,7 +26,7 @@ import (
 //	@Security		ApiKeyAuth
 //	@Router			/users/feed [get]
 func (app *application) getUserFeedHandler(w http.ResponseWriter, r *http.Request) {
-	// pagination, filters, sort
+	user := getUserFromContext(r)
 
 	fq := store.PaginatedFeedQuery{
 		Limit: 	20,
@@ -46,8 +46,7 @@ func (app *application) getUserFeedHandler(w http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 
-	// TODO: get userID from auth instead of hardcoding userID
-	feed, err := app.store.Posts.GetUserFeed(ctx, int64(43898), fq)
+	feed, err := app.store.Posts.GetUserFeed(ctx, user.ID, fq)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -67,7 +66,7 @@ func (app *application) getUserFeedHandler(w http.ResponseWriter, r *http.Reques
 		NextCursor: nextCursor,
 	}
 
-	if err := writeJSON(w, http.StatusOK, response); err != nil {
+	if err := app.jsonResponse(w, http.StatusOK, response); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}

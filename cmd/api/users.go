@@ -2,15 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/Zevyron/gopher-social/internal/store"
 	"github.com/go-chi/chi/v5"
 )
-
-type userKey string
-const userCtx userKey = "user"
 
 type FollowUserPayload struct {
 	FollowerID int64 `json:"user_id"`
@@ -53,20 +51,22 @@ func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 //	@Security		ApiKeyAuth
 //	@Router			/users/{userID}/follow [put]
 func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request) {
-	user := getUserFromContext(r)
-	userID := user.ID
-
-	// TODO: Revert back to auth followerID from ctx
-	var payload FollowUserPayload
-	if err := readJSON(w, r, &payload); err != nil {
-		app.badRequestResponse(w, r, err)
+	followID, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
+	if err != nil {
+		app.notFoundResponse(w, r, errors.New("invalid user ID"))
 		return
 	}
-	followerID := payload.FollowerID
+
+	follower := getUserFromContext(r)
+
+	if follower.ID == followID {
+		app.badRequestResponse(w, r, errors.New("a user cannot follow themselves"))
+		return
+	}
 
 	ctx := r.Context()
 
-	if err := app.store.Followers.Follow(ctx, userID, followerID); err != nil {
+	if err := app.store.Followers.Follow(ctx, followID, follower.ID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -92,20 +92,21 @@ func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request
 //	@Security		ApiKeyAuth
 //	@Router			/users/{userID}/unfollow [put]
 func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Request) {
-	user := getUserFromContext(r)
-	userID := user.ID
-
-	// TODO: Revert back to auth followerID from ctx
-	var payload FollowUserPayload
-	if err := readJSON(w, r, &payload); err != nil {
-		app.badRequestResponse(w, r, err)
+	unfollowID, err := strconv.ParseInt(chi.URLParam(r, "userID"), 10, 64)
+	if err != nil {
+		app.notFoundResponse(w, r, err)
 		return
 	}
-	followerID := payload.FollowerID
+
+	follower := getUserFromContext(r)
+
+	if follower.ID == unfollowID {
+		app.badRequestResponse(w, r, errors.New("invalid request"))
+	}
 
 	ctx := r.Context()
 
-	if err := app.store.Followers.Unfollow(ctx, userID, followerID); err != nil {
+	if err := app.store.Followers.Unfollow(ctx, unfollowID, follower.ID); err != nil {
 		app.internalServerError(w, r, err)
 		return
 	}
@@ -142,9 +143,4 @@ func (app *application) userContextMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-func getUserFromContext(r *http.Request) *store.User {
-	user, _ := r.Context().Value(userCtx).(*store.User)
-	return user
 }
