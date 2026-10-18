@@ -15,7 +15,9 @@ import (
 	"github.com/MarceloPetrucio/go-scalar-api-reference"
 	"github.com/Zevyron/gopher-social/internal/auth"
 	"github.com/Zevyron/gopher-social/internal/mailer"
+	"github.com/Zevyron/gopher-social/internal/ratelimiter"
 	"github.com/Zevyron/gopher-social/internal/store"
+	"github.com/Zevyron/gopher-social/internal/store/cache"
 	"github.com/Zevyron/gopher-social/internal/worker"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -31,6 +33,8 @@ type application struct {
 	db				*sql.DB
 	mailer 			mailer.Client
 	authenticator 	auth.Authenticator
+	cacheStorage	cache.Cache
+	rateLimiter 	ratelimiter.Limiter
 }
 
 type config struct {
@@ -40,6 +44,8 @@ type config struct {
 	env 		string
 	mail 		mailConfig
 	auth		authConfig
+	redisCfg	redisConfig
+	rateLimiter ratelimiter.Config
 }
 
 type authConfig struct {
@@ -63,6 +69,13 @@ type dbConfig struct {
 	maxIdleTime 	string
 }
 
+type redisConfig struct {
+	addr 		string
+	password 	string
+	db			int
+	enabled 	bool
+}
+
 func (app *application) mount() http.Handler {
 	r := chi.NewRouter()
 
@@ -70,6 +83,7 @@ func (app *application) mount() http.Handler {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(app.RateLimiterMiddleware)
 
 	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
     content, err := os.ReadFile("./docs/swagger.json")

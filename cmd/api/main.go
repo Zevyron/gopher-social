@@ -7,8 +7,11 @@ import (
 	"github.com/Zevyron/gopher-social/internal/db"
 	"github.com/Zevyron/gopher-social/internal/env"
 	"github.com/Zevyron/gopher-social/internal/mailer"
+	"github.com/Zevyron/gopher-social/internal/ratelimiter"
 	"github.com/Zevyron/gopher-social/internal/store"
+	"github.com/Zevyron/gopher-social/internal/store/cache"
 	"github.com/go-playground/validator/v10"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +38,17 @@ func main() {
 						iss:	env.GetString("AUTH_TOKEN_ISS", "gophersocial"),
 				},
 		},
+		redisCfg: redisConfig{
+			addr: 		env.GetString("REDIS_ADDR", "localhost:6379"),
+			password: 	env.GetString("REDIS_PW", ""),
+			db:			env.GetInt("REDIS_DB", 0),
+			enabled:	env.GetBool("REDIS_ENABLED", true),
+		},
+		rateLimiter: ratelimiter.Config{
+			RequestPerTimeFrame: 	env.GetInt("RATELIMITER_REQUESTS_COUNT", 20),
+			TimeFrame: 				time.Second * 5,
+			Enabled:				env.GetBool("RATELIMITER_ENABLED", true),
+		},
 	}
 
 	// Logger
@@ -58,6 +72,21 @@ func main() {
 	}
 	defer dbConn.Close()
 	logger.Info("database connection pool established")
+
+	var rdb *redis.Client
+	if cfg.redisCfg.enabled {
+		rdb, err = cache.NewRedisClient(cfg.redisCfg.addr, cfg.redisCfg.password, cfg.redisCfg.db)
+		if err != nil {
+			logger.Fatalf("failed to connect to redis %v", err)
+		}
+		defer rdb.Close()
+		logger.Info("redis cache connection established")
+	}
+
+	rateLimiter := ratelimiter.NewFixedWindowLimiter(
+		cfg.rateLimiter.RequestPerTimeFrame,
+		cfg.rateLimiter.TimeFrame,
+	)
 
 	// Mailer Client Setup
 	mailCfg := mailer.Config{
@@ -94,6 +123,8 @@ func main() {
 		logger:    logger,
 		mailer:    mailClient,
 		authenticator: jwtAuthenticator,
+		cacheStorage: cache.NewRedisCache(rdb),
+		rateLimiter: rateLimiter,
 	}
 
 	mux := app.mount()

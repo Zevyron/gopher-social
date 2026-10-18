@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,7 +51,7 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 
 		ctx := r.Context()
 
-		user, err := app.store.Users.GetByID(ctx, userID)
+		user, err := app.getUser(ctx, userID)
 		if err != nil {
 			app.unauthorizedResponse(w, r, err)
 			return
@@ -58,6 +59,50 @@ func (app *application) AuthTokenMiddleware(next http.Handler) http.Handler {
 
 		ctx = context.WithValue(ctx, userCtx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (app *application) getUser(ctx context.Context, userID int64) (*store.User, error) {
+	if !app.config.redisCfg.enabled {
+		return app.store.Users.GetByID(ctx, userID)
+	}
+
+	user, err := app.cacheStorage.Users.Get(ctx, userID)
+	if err != nil {
+		app.logger.Warnw("redis cache get failed, falling back to postgres", "error", err, "userID", userID)
+	}
+
+	if user != nil {
+		return user, nil
+	}
+
+	user, err = app.store.Users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := app.cacheStorage.Users.Set(ctx, user); err != nil {
+		app.logger.Warnw("redis cache set failed", "error", err, "userID", userID)
+	}
+
+	return user, nil
+}
+
+func (app *application) RateLimiterMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request ) {
+		if app.config.rateLimiter.Enabled {
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				ip = r.RemoteAddr
+			}
+
+			if allow, retryAfter := app.rateLimiter.Allow(ip); !allow {
+				app.rateLimiteExceededResponse(w, r, retryAfter.String())
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}
 	})
 }
 
