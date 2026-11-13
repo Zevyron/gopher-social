@@ -1,7 +1,7 @@
 # GopherSocial API
 
 <div style="margin-bottom:20px">
-  <a href="#"><img alt="go-version" src="https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go"/></a>
+  <a href="#"><img alt="go-version" src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square&logo=go"/></a>
   <a href="#"><img alt="postgres-version" src="https://img.shields.io/badge/PostgreSQL-16.3-336791?style=flat-square&logo=postgresql"/></a>
   <a href="#"><img alt="redis-version" src="https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis"/></a>
   <a href="#"><img alt="docker-version" src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker"/></a>
@@ -29,7 +29,7 @@
 
 ## Technologies & Libraries
 
-- ✔️ **Go** - Core backend runtime.
+- ✔️ **Go** - Core backend runtime and concurrency.
 - ✔️ **go-chi/chi** - Lightweight, idiomatic HTTP router.
 - ✔️ **PostgreSQL** - Primary relational database for persistent, transactional storage.
 - ✔️ **Redis** - In-memory store for user identity caching.
@@ -62,7 +62,7 @@ Instead of distributing into microservices prematurely, this system utilizes a m
 
 ### Prerequisites
 
-Ensure you have **Go (1.23+)**, **Docker**, and **Docker Compose** installed.
+Ensure you have **Go (1.26+)**, **Docker**, and **Docker Compose** installed.
 
 ### 1. Boot the Infrastructure (PostgreSQL & Redis)
 
